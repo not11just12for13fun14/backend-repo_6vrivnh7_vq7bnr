@@ -1,48 +1,83 @@
 """
-Database Schemas
+LibVault Database Schemas
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
-
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Each Pydantic model represents a MongoDB collection. The collection name is the
+lowercased class name.
 """
+from typing import Optional, List, Literal
+from datetime import datetime
+from pydantic import BaseModel, Field, EmailStr
 
-from pydantic import BaseModel, Field
-from typing import Optional
-
-# Example schemas (replace with your own):
-
+# Core domain models
 class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    full_name: str = Field(..., description="Full name of the user")
+    email: EmailStr = Field(..., description="Unique email address")
+    role: Literal["admin", "librarian", "member"] = Field("member")
+    is_active: bool = Field(True)
+    two_factor_enabled: bool = Field(False)
+    avatar_url: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    member_id: Optional[str] = Field(None, description="Human-readable member id for Digital Library Card")
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+class Book(BaseModel):
+    isbn: Optional[str] = Field(None, description="ISBN-10/13 if available")
+    title: str
+    author: str
+    publisher: Optional[str] = None
+    year: Optional[int] = None
+    genres: List[str] = []
+    copies_total: int = 1
+    copies_available: int = 1
+    tags: List[str] = []
+    cover_url: Optional[str] = None
+    summary: Optional[str] = None
 
-# Add your own schemas here:
-# --------------------------------------------------
+class Transaction(BaseModel):
+    user_id: str
+    book_id: str
+    type: Literal["borrow", "return", "renew"]
+    due_date: Optional[datetime] = None
+    notes: Optional[str] = None
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class Document(BaseModel):
+    title: str
+    description: Optional[str] = None
+    file_url: Optional[str] = Field(None, description="Location of uploaded asset")
+    mime_type: Optional[str] = None
+    tags: List[str] = []
+    version: int = 1
+    related_book_id: Optional[str] = None
+
+class Subscription(BaseModel):
+    user_id: str
+    plan: Literal["free", "pro", "enterprise"] = "free"
+    status: Literal["active", "past_due", "canceled"] = "active"
+    current_period_end: Optional[datetime] = None
+    last_invoice_url: Optional[str] = None
+
+class ForumPost(BaseModel):
+    user_id: str
+    title: str
+    content: str
+    tags: List[str] = []
+    club_id: Optional[str] = None
+
+class Club(BaseModel):
+    name: str
+    description: Optional[str] = None
+    owner_id: str
+    member_ids: List[str] = []
+
+class Report(BaseModel):
+    name: str
+    filters: dict = {}
+    generated_url: Optional[str] = None
+
+# Security settings snapshot for Settings page
+class SecuritySettings(BaseModel):
+    rbac_matrix: dict = {}
+    backup_enabled: bool = True
+    backup_frequency_days: int = 7
+    allow_export: bool = False
+    password_policy: dict = {"min_length": 8, "require_symbol": True}
